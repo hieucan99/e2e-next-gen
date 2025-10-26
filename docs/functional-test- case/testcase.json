@@ -1,0 +1,27 @@
+{
+    "Feature": "Home Page Search Functionality",
+    "TestCases": [
+        {
+            "testcaseId": "F_001",
+            "description": "Verify user could search for a product",
+            "preconditions": "User is on the Home page",
+            "steps": [
+                {
+                    "action": "Click on the Search bar",
+                    "note": "Search icon locator [class=\"nds-btn nds-button--icon-only search-start-btn css-1pto8ls ex41m6f0 btn-secondary-dark \"]",
+                    "expectedResult" : "Search bar is displayed"
+                },
+                {
+                    "action": "Input `air force 1` and press Enter",
+                    "note": "Input locator [id=\"gn-search-input\"]",
+                    "expectedResult" : "Search results for `air force 1` are displayed including number of products. (eg: `air force 1(142)`)"
+                },
+                {
+                    "action": "Verify list of products names displayed",
+                    "note": "Product name locator: [class=\"product-card__title\"]",
+                    "expectedResult" : "List of product names is displayed included text: `Air Force 1`"
+                }
+            ],
+            "tag": ["Functionality", "search"]
+    }
+]}

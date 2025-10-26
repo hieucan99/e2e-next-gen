@@ -1,0 +1,35 @@
+[
+  {
+    "id": "user-001",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@test.com",
+    "username": "johndoe",
+    "password": "TestPassword123!",
+    "phoneNumber": "+1 (555) 123-4567",
+    "dateOfBirth": "1985-05-15",
+    "role": "user"
+  },
+  {
+    "id": "admin-001",
+    "firstName": "Admin",
+    "lastName": "User",
+    "email": "admin@test.com",
+    "username": "admin",
+    "password": "AdminPassword123!",
+    "phoneNumber": "+1 (555) 999-0000",
+    "dateOfBirth": "1980-01-01",
+    "role": "admin"
+  },
+  {
+    "id": "user-002",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@test.com",
+    "username": "janesmith",
+    "password": "TestPassword123!",
+    "phoneNumber": "+1 (555) 234-5678",
+    "dateOfBirth": "1990-08-22",
+    "role": "user"
+  }
+]

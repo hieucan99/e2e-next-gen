@@ -1,0 +1,25 @@
+{
+    "Features": "Home Page Access",
+    "TestCases": [
+        {
+            "testcaseId": "S_001",
+            "description": "Verify user could access the Home page",
+            "preconditions": "None",
+            "steps": [
+            {
+                "action": "navigate to Home page",
+                "expectedResult" : "Home page is displayed"
+            },
+            {
+                "action": "verify",
+                "expectedResult" : "Home page loads successfully"
+            },
+            {
+                "action": "verify",
+                "expectedResult" : "Menu bar is displayed include options: `New & Featured`, `Men`, `Women`, `Kids`, `Sale`"
+
+            }
+        ],
+        "tag": ["smoke", "home-page"]
+    }
+]}

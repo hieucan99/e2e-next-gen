@@ -1,0 +1,40 @@
+{
+  "name": "e2e-next-gen",
+  "version": "1.0.0",
+  "description": "Playwright E2E automation project using MCP pattern and Copilot integration.",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test tests/smoke --reporter=html,junit",
+    "test:functional": "playwright test tests/functional --reporter=html,junit",
+    "test:regression": "playwright test tests/regression --reporter=html,junit",
+    "test:api": "playwright test tests/api --reporter=html,junit",
+    "test:visual": "playwright test tests/visual --reporter=html,junit",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:trace": "playwright show-trace",
+    "test:codegen": "playwright codegen",
+    "test:install": "playwright install",
+    "test:install-deps": "playwright install-deps",
+    "lint": "tsc --noEmit",
+    "lint:fix": "tsc --noEmit && prettier --write .",
+    "clean": "rimraf test-results playwright-report reports/screenshots",
+    "setup": "npm install && playwright install",
+    "dev:setup": "npm run setup && npm run test:smoke",
+    "ci:test": "npm run clean && npm run test",
+    "generate:data": "node scripts/generate-test-data.js",
+    "validate:schemas": "node scripts/validate-schemas.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@types/node": "^20.0.0",
+    "ajv": "^8.12.0",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1"
+  }
+}

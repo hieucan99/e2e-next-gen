@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "declaration": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@pages/*": ["pages/*"],
+      "@components/*": ["components/*"],
+      "@utils/*": ["utils/*"],
+      "@workflows/*": ["workflows/*"],
+      "@data/*": ["data/*"],
+      "@config/*": ["config/*"]
+    },
+    "types": ["node", "@playwright/test"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "tests/**/*",
+    "pages/**/*",
+    "components/**/*",
+    "workflows/**/*",
+    "utils/**/*",
+    "data/**/*",
+    "config/**/*",
+    "copilot-generated/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "reports",
+    "playwright-report",
+    "test-results"
+  ]
+}
