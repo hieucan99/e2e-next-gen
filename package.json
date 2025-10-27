@@ -24,7 +24,15 @@
     "dev:setup": "npm run setup && npm run test:smoke",
     "ci:test": "npm run clean && npm run test",
     "generate:data": "node scripts/generate-test-data.js",
-    "validate:schemas": "node scripts/validate-schemas.js"
+    "validate:schemas": "node scripts/validate-schemas.js",
+    "docker:build": "docker build -t e2e-next-gen:latest .",
+    "docker:test": "pwsh scripts/run-docker-tests.ps1",
+    "docker:test:smoke": "pwsh scripts/run-docker-tests.ps1 -TestSuite smoke",
+    "docker:test:functional": "pwsh scripts/run-docker-tests.ps1 -TestSuite functional",
+    "docker:test:regression": "pwsh scripts/run-docker-tests.ps1 -TestSuite regression",
+    "docker:test:build": "pwsh scripts/run-docker-tests.ps1 -Build",
+    "test:summary": "ts-node utils/TestRunLogger.ts",
+    "test:cleanup": "ts-node -e \"require('./utils/TestRunLogger').TestRunLogger.cleanup()\""
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
@@ -32,6 +40,7 @@
     "ajv": "^8.12.0",
     "prettier": "^3.0.0",
     "rimraf": "^5.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },
   "dependencies": {

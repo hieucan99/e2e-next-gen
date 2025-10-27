@@ -1,0 +1,201 @@
+name: E2E Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run tests'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - functional
+          - regression
+          - api
+          - all
+      base_url:
+        description: 'Base URL (optional, overrides default)'
+        required: false
+        type: string
+
+env:
+  DOCKER_IMAGE_NAME: e2e-next-gen
+  DOCKER_IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.test_suite)) || fromJSON('["smoke", "functional"]') }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Generate run timestamp
+        id: timestamp
+        run: echo "RUN_TIME=$(date -u +%Y-%m-%dT%H-%M-%S)" >> $GITHUB_OUTPUT
+      
+      - name: Determine base URL
+        id: base-url
+        run: |
+          if [ -n "${{ github.event.inputs.base_url }}" ]; then
+            echo "BASE_URL=${{ github.event.inputs.base_url }}" >> $GITHUB_OUTPUT
+          else
+            echo "BASE_URL=https://www.nike.com/vn" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Determine test command
+        id: test-command
+        run: |
+          TEST_SUITE="${{ matrix.test-suite }}"
+          case "$TEST_SUITE" in
+            smoke)
+              echo "COMMAND=npx playwright test tests/smoke" >> $GITHUB_OUTPUT
+              ;;
+            functional)
+              echo "COMMAND=npx playwright test tests/functional" >> $GITHUB_OUTPUT
+              ;;
+            regression)
+              echo "COMMAND=npx playwright test tests/regression" >> $GITHUB_OUTPUT
+              ;;
+            api)
+              echo "COMMAND=npx playwright test tests/api" >> $GITHUB_OUTPUT
+              ;;
+            all)
+              echo "COMMAND=npm test" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "COMMAND=npm test" >> $GITHUB_OUTPUT
+              ;;
+          esac
+      
+      - name: Create test results directory
+        run: mkdir -p test-results/${{ steps.timestamp.outputs.RUN_TIME }}
+      
+      - name: Record test run parameters
+        run: |
+          cat > test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json <<EOF
+          {
+            "runTime": "${{ steps.timestamp.outputs.RUN_TIME }}",
+            "environment": "${{ github.event.inputs.environment || 'dev' }}",
+            "testSuite": "${{ matrix.test-suite }}",
+            "baseUrl": "${{ steps.base-url.outputs.BASE_URL }}",
+            "headless": "true",
+            "browser": "chromium",
+            "workers": "4",
+            "command": "${{ steps.test-command.outputs.COMMAND }}",
+            "timestamp": "$(date -u +%Y-%m-%d\ %H:%M:%S)",
+            "gitRef": "${{ github.ref }}",
+            "gitSha": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "workflow": "${{ github.workflow }}",
+            "runNumber": "${{ github.run_number }}"
+          }
+          EOF
+      
+      - name: Run tests in Docker
+        run: |
+          docker run --rm \
+            --name e2e-tests-${{ steps.timestamp.outputs.RUN_TIME }} \
+            -e BASE_URL="${{ steps.base-url.outputs.BASE_URL }}" \
+            -e HEADLESS=true \
+            -e TIMEOUT=30000 \
+            -e CI=true \
+            -e RUN_TIME="${{ steps.timestamp.outputs.RUN_TIME }}" \
+            -e TEST_ENV="${{ github.event.inputs.environment || 'dev' }}" \
+            -v "$(pwd)/test-results:/app/test-results" \
+            ${{ env.DOCKER_IMAGE_NAME }}:${{ env.DOCKER_IMAGE_TAG }} \
+            sh -c "${{ steps.test-command.outputs.COMMAND }}"
+      
+      - name: Update run info with results
+        if: always()
+        run: |
+          STATUS="${{ job.status == 'success' && 'passed' || 'failed' }}"
+          EXIT_CODE="${{ job.status == 'success' && '0' || '1' }}"
+          
+          # Read existing run-info.json and add status fields
+          jq --arg status "$STATUS" --arg exitCode "$EXIT_CODE" \
+            '. + {status: $status, exitCode: ($exitCode | tonumber)}' \
+            test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json > temp.json
+          mv temp.json test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.test-suite }}-${{ steps.timestamp.outputs.RUN_TIME }}
+          path: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/
+          retention-days: 30
+      
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-report-${{ matrix.test-suite }}-${{ steps.timestamp.outputs.RUN_TIME }}
+          path: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/report.html/
+          retention-days: 30
+      
+      - name: Publish test results summary
+        if: always()
+        run: |
+          echo "## Test Results - ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Suite:** ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base URL:** ${{ steps.base-url.outputs.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Time:** ${{ steps.timestamp.outputs.RUN_TIME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json" ]; then
+            echo "### Results Summary" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            cat test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json | jq '.suites[].suites[].specs[] | {title: .title, ok: .ok}' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+  
+  notification:
+    name: Notify Results
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Summary
+        run: |
+          echo "## Overall Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All test suites have completed execution." >> $GITHUB_STEP_SUMMARY
+          echo "Check individual test suite artifacts for detailed results." >> $GITHUB_STEP_SUMMARY

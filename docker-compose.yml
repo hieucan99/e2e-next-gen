@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: e2e-next-gen:latest
+    container_name: e2e-tests
+    environment:
+      - BASE_URL=${BASE_URL:-https://www.nike.com/vn}
+      - HEADLESS=${HEADLESS:-true}
+      - TIMEOUT=${TIMEOUT:-30000}
+      - CI=${CI:-true}
+      - RUN_TIME=${RUN_TIME:-}
+      - TEST_ENV=${TEST_ENV:-dev}
+    volumes:
+      - ./test-results:/app/test-results
+    command: npm test
+    
+  # Service for running smoke tests
+  smoke-tests:
+    extends: e2e-tests
+    container_name: e2e-smoke-tests
+    command: npx playwright test tests/smoke
+    
+  # Service for running functional tests
+  functional-tests:
+    extends: e2e-tests
+    container_name: e2e-functional-tests
+    command: npx playwright test tests/functional
+    
+  # Service for running regression tests
+  regression-tests:
+    extends: e2e-tests
+    container_name: e2e-regression-tests
+    command: npx playwright test tests/regression
+    
+  # Service for running API tests
+  api-tests:
+    extends: e2e-tests
+    container_name: e2e-api-tests
+    command: npx playwright test tests/api

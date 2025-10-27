@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import EnvConfig from './env.config';
 
+// Generate timestamp for test run
+const runTime = process.env.RUN_TIME || new Date().toISOString().replace(/:/g, '-').split('.')[0];
+const outputDir = `test-results/${runTime}`;
+
 export default defineConfig({
   testDir: './tests',
   timeout: EnvConfig.BROWSER_TIMEOUT,
@@ -11,8 +15,16 @@ export default defineConfig({
   // Run all tests in parallel.
   fullyParallel: true,
 
+  // Output directory for test artifacts
+  outputDir: `${outputDir}/artifacts`,
+
   // Reporter for test results
-  reporter: 'html',
+  reporter: [
+    ['html', { outputFolder: `${outputDir}/report.html`, open: 'never' }],
+    ['json', { outputFile: `${outputDir}/results.json` }],
+    ['junit', { outputFile: `${outputDir}/junit.xml` }],
+    ['list']
+  ],
 
   use: {
     headless: EnvConfig.HEADLESS,
