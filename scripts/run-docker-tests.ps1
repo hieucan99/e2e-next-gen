@@ -192,6 +192,11 @@ $ExitCode = $LASTEXITCODE
 Write-Host ""
 Write-Host "=====================================" -ForegroundColor Cyan
 
+# Ensure directory exists before writing (Docker may not have created it on host)
+if (-not (Test-Path $ResultsDir)) {
+    New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
+}
+
 # Update run-info.json with results
 if ($ExitCode -eq 0) {
     Write-Host "Tests completed successfully!" -ForegroundColor Green

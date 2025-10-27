@@ -218,6 +218,9 @@ EXIT_CODE=$?
 echo ""
 echo "====================================="
 
+# Ensure directory exists before writing (Docker may not have created it on host)
+mkdir -p "$RESULTS_DIR"
+
 # Update run-info.json with results
 if [ $EXIT_CODE -eq 0 ]; then
     echo "Tests completed successfully!"

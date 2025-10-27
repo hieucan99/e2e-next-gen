@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   e2e-tests:
     build:
@@ -20,24 +18,60 @@ services:
     
   # Service for running smoke tests
   smoke-tests:
-    extends: e2e-tests
+    image: e2e-next-gen:latest
     container_name: e2e-smoke-tests
+    environment:
+      - BASE_URL=${BASE_URL:-https://www.nike.com/vn}
+      - HEADLESS=${HEADLESS:-true}
+      - TIMEOUT=${TIMEOUT:-30000}
+      - CI=${CI:-true}
+      - RUN_TIME=${RUN_TIME:-}
+      - TEST_ENV=${TEST_ENV:-dev}
+    volumes:
+      - ./test-results:/app/test-results
     command: npx playwright test tests/smoke
     
   # Service for running functional tests
   functional-tests:
-    extends: e2e-tests
+    image: e2e-next-gen:latest
     container_name: e2e-functional-tests
+    environment:
+      - BASE_URL=${BASE_URL:-https://www.nike.com/vn}
+      - HEADLESS=${HEADLESS:-true}
+      - TIMEOUT=${TIMEOUT:-30000}
+      - CI=${CI:-true}
+      - RUN_TIME=${RUN_TIME:-}
+      - TEST_ENV=${TEST_ENV:-dev}
+    volumes:
+      - ./test-results:/app/test-results
     command: npx playwright test tests/functional
     
   # Service for running regression tests
   regression-tests:
-    extends: e2e-tests
+    image: e2e-next-gen:latest
     container_name: e2e-regression-tests
+    environment:
+      - BASE_URL=${BASE_URL:-https://www.nike.com/vn}
+      - HEADLESS=${HEADLESS:-true}
+      - TIMEOUT=${TIMEOUT:-30000}
+      - CI=${CI:-true}
+      - RUN_TIME=${RUN_TIME:-}
+      - TEST_ENV=${TEST_ENV:-dev}
+    volumes:
+      - ./test-results:/app/test-results
     command: npx playwright test tests/regression
     
   # Service for running API tests
   api-tests:
-    extends: e2e-tests
+    image: e2e-next-gen:latest
     container_name: e2e-api-tests
+    environment:
+      - BASE_URL=${BASE_URL:-https://www.nike.com/vn}
+      - HEADLESS=${HEADLESS:-true}
+      - TIMEOUT=${TIMEOUT:-30000}
+      - CI=${CI:-true}
+      - RUN_TIME=${RUN_TIME:-}
+      - TEST_ENV=${TEST_ENV:-dev}
+    volumes:
+      - ./test-results:/app/test-results
     command: npx playwright test tests/api
