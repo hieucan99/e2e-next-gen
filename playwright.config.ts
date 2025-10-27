@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import EnvConfig from './env.config';
+import EnvConfig from './config/env.config';
 
 // Generate timestamp for test run
 const runTime = process.env.RUN_TIME || new Date().toISOString().replace(/:/g, '-').split('.')[0];
@@ -30,8 +30,8 @@ export default defineConfig({
     headless: EnvConfig.HEADLESS,
     viewport: { width: 1280, height: 720 },
     ignoreHTTPSErrors: true,
-    video: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    video: 'on',
+    screenshot: 'on',
     baseURL: EnvConfig.BASE_URL,
     // Global timeout for all actions
     actionTimeout: 10000,

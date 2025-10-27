@@ -144,12 +144,38 @@ jobs:
         run: |
           STATUS="${{ job.status == 'success' && 'passed' || 'failed' }}"
           EXIT_CODE="${{ job.status == 'success' && '0' || '1' }}"
+          RUN_INFO_FILE="test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json"
           
-          # Read existing run-info.json and add status fields
-          jq --arg status "$STATUS" --arg exitCode "$EXIT_CODE" \
-            '. + {status: $status, exitCode: ($exitCode | tonumber)}' \
-            test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json > temp.json
-          mv temp.json test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json
+          # Check if run-info.json exists
+          if [ -f "$RUN_INFO_FILE" ]; then
+            # Read existing run-info.json and add status fields
+            jq --arg status "$STATUS" --arg exitCode "$EXIT_CODE" \
+              '. + {status: $status, exitCode: ($exitCode | tonumber)}' \
+              "$RUN_INFO_FILE" > temp.json && mv temp.json "$RUN_INFO_FILE"
+          else
+            echo "Warning: run-info.json not found at $RUN_INFO_FILE"
+            # Create a basic run-info.json with available information
+            cat > "$RUN_INFO_FILE" <<EOF
+          {
+            "runTime": "${{ steps.timestamp.outputs.RUN_TIME }}",
+            "environment": "${{ github.event.inputs.environment || 'dev' }}",
+            "testSuite": "${{ matrix.test-suite }}",
+            "baseUrl": "${{ steps.base-url.outputs.BASE_URL }}",
+            "headless": "true",
+            "browser": "chromium",
+            "workers": "4",
+            "command": "${{ steps.test-command.outputs.COMMAND }}",
+            "timestamp": "$(date -u +%Y-%m-%d\ %H:%M:%S)",
+            "status": "$STATUS",
+            "exitCode": $EXIT_CODE,
+            "gitRef": "${{ github.ref }}",
+            "gitSha": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "workflow": "${{ github.workflow }}",
+            "runNumber": "${{ github.run_number }}"
+          }
+          EOF
+          fi
       
       - name: Upload test results
         if: always()
