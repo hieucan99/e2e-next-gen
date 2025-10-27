@@ -141,16 +141,51 @@ if ($Build) {
 
 # Determine test command based on suite
 $TestCommand = "npm test"
+$TestDir = "tests"
+
 if ($TestSuite) {
     $TestCommand = switch ($TestSuite.ToLower()) {
-        "smoke"      { "npx playwright test tests/smoke" }
-        "functional" { "npx playwright test tests/functional" }
-        "regression" { "npx playwright test tests/regression" }
-        "api"        { "npx playwright test tests/api" }
-        "all"        { "npm test" }
-        default      { "npm test" }
+        "smoke"      { 
+            $TestDir = "tests/smoke"
+            "npx playwright test tests/smoke" 
+        }
+        "functional" { 
+            $TestDir = "tests/functional"
+            "npx playwright test tests/functional" 
+        }
+        "regression" { 
+            $TestDir = "tests/regression"
+            "npx playwright test tests/regression" 
+        }
+        "api"        { 
+            $TestDir = "tests/api"
+            "npx playwright test tests/api" 
+        }
+        "all"        { 
+            $TestDir = "tests"
+            "npm test" 
+        }
+        default      { 
+            $TestDir = "tests"
+            "npm test" 
+        }
     }
 }
+
+# Check if test directory exists and has test files
+$HasTests = $false
+if (Test-Path $TestDir) {
+    $TestFiles = Get-ChildItem -Path $TestDir -Recurse -Include "*.spec.ts","*.test.ts" -File
+    if ($TestFiles.Count -gt 0) {
+        $HasTests = $true
+        Write-Host "✅ Found $($TestFiles.Count) test file(s) in $TestDir" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  No test files found in $TestDir" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "❌ Test directory not found: $TestDir" -ForegroundColor Red
+}
+Write-Host ""
 
 # Create test-results directory if it doesn't exist
 $ResultsDir = "test-results\$RunTime"
@@ -166,10 +201,22 @@ $RunRecord = @{
     browser     = $Browser
     workers     = $Workers
     command     = $TestCommand
+    hasTests    = $HasTests
     timestamp   = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 }
 
 Update-RunInfo -Path $ResultsDir -Data $RunRecord
+
+# Skip test execution if no tests found
+if (-not $HasTests) {
+    Write-Host "=====================================" -ForegroundColor Cyan
+    Write-Host "⚠️  Test suite skipped: No test files found" -ForegroundColor Yellow
+    Update-RunInfo -Path $ResultsDir -Data $RunRecord -Status "skipped" -ExitCode 0
+    Write-Host "Test results saved to: $ResultsDir" -ForegroundColor Cyan
+    Write-Host "=====================================" -ForegroundColor Cyan
+    Write-Host ""
+    exit 0
+}
 
 Write-Host "Running tests in Docker container..." -ForegroundColor Yellow
 Write-Host ""

@@ -167,28 +167,52 @@ fi
 
 # Determine test command based on suite
 TEST_COMMAND="npm test"
+TEST_DIR="tests"
+
 if [ -n "$TEST_SUITE" ]; then
     case "${TEST_SUITE,,}" in
         smoke)
             TEST_COMMAND="npx playwright test tests/smoke"
+            TEST_DIR="tests/smoke"
             ;;
         functional)
             TEST_COMMAND="npx playwright test tests/functional"
+            TEST_DIR="tests/functional"
             ;;
         regression)
             TEST_COMMAND="npx playwright test tests/regression"
+            TEST_DIR="tests/regression"
             ;;
         api)
             TEST_COMMAND="npx playwright test tests/api"
+            TEST_DIR="tests/api"
             ;;
         all)
             TEST_COMMAND="npm test"
+            TEST_DIR="tests"
             ;;
         *)
             TEST_COMMAND="npm test"
+            TEST_DIR="tests"
             ;;
     esac
 fi
+
+# Check if test directory exists and has test files
+HAS_TESTS=false
+if [ -d "$TEST_DIR" ]; then
+    TEST_COUNT=$(find "$TEST_DIR" -type f \( -name "*.spec.ts" -o -name "*.test.ts" \) | wc -l)
+    
+    if [ "$TEST_COUNT" -gt 0 ]; then
+        HAS_TESTS=true
+        echo "✅ Found $TEST_COUNT test file(s) in $TEST_DIR"
+    else
+        echo "⚠️  No test files found in $TEST_DIR"
+    fi
+else
+    echo "❌ Test directory not found: $TEST_DIR"
+fi
+echo ""
 
 # Create test-results directory if it doesn't exist
 RESULTS_DIR="test-results/$RUN_TIME"
@@ -196,6 +220,26 @@ mkdir -p "$RESULTS_DIR"
 
 # Record test run parameters (initial)
 update_run_info "$RESULTS_DIR" "" ""
+
+# Add hasTests field to run-info.json
+jq --arg hasTests "$HAS_TESTS" '. + {hasTests: $hasTests}' \
+    "$RESULTS_DIR/run-info.json" > temp.json && mv temp.json "$RESULTS_DIR/run-info.json"
+
+# Skip test execution if no tests found
+if [ "$HAS_TESTS" = false ]; then
+    echo "====================================="
+    echo "⚠️  Test suite skipped: No test files found"
+    update_run_info "$RESULTS_DIR" "skipped" "0"
+    
+    # Add message to run-info.json
+    jq '. + {message: "No test files found"}' \
+        "$RESULTS_DIR/run-info.json" > temp.json && mv temp.json "$RESULTS_DIR/run-info.json"
+    
+    echo "Test results saved to: $RESULTS_DIR"
+    echo "====================================="
+    echo ""
+    exit 0
+fi
 
 echo "Running tests in Docker container..."
 echo ""

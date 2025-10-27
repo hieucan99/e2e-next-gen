@@ -83,23 +83,50 @@ jobs:
           case "$TEST_SUITE" in
             smoke)
               echo "COMMAND=npx playwright test tests/smoke" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests/smoke" >> $GITHUB_OUTPUT
               ;;
             functional)
               echo "COMMAND=npx playwright test tests/functional" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests/functional" >> $GITHUB_OUTPUT
               ;;
             regression)
               echo "COMMAND=npx playwright test tests/regression" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests/regression" >> $GITHUB_OUTPUT
               ;;
             api)
               echo "COMMAND=npx playwright test tests/api" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests/api" >> $GITHUB_OUTPUT
               ;;
             all)
               echo "COMMAND=npm test" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "COMMAND=npm test" >> $GITHUB_OUTPUT
+              echo "TEST_DIR=tests" >> $GITHUB_OUTPUT
               ;;
           esac
+      
+      - name: Check for test files
+        id: check-tests
+        run: |
+          TEST_DIR="${{ steps.test-command.outputs.TEST_DIR }}"
+          
+          if [ ! -d "$TEST_DIR" ]; then
+            echo "HAS_TESTS=false" >> $GITHUB_OUTPUT
+            echo "❌ Test directory not found: $TEST_DIR"
+          else
+            # Check for .spec.ts or .test.ts files
+            TEST_COUNT=$(find "$TEST_DIR" -type f \( -name "*.spec.ts" -o -name "*.test.ts" \) | wc -l)
+            
+            if [ "$TEST_COUNT" -eq 0 ]; then
+              echo "HAS_TESTS=false" >> $GITHUB_OUTPUT
+              echo "⚠️  No test files found in $TEST_DIR"
+            else
+              echo "HAS_TESTS=true" >> $GITHUB_OUTPUT
+              echo "✅ Found $TEST_COUNT test file(s) in $TEST_DIR"
+            fi
+          fi
       
       - name: Create test results directory
         run: mkdir -p test-results/${{ steps.timestamp.outputs.RUN_TIME }}
@@ -117,6 +144,7 @@ jobs:
             "workers": "4",
             "command": "${{ steps.test-command.outputs.COMMAND }}",
             "timestamp": "$(date -u +%Y-%m-%d\ %H:%M:%S)",
+            "hasTests": "${{ steps.check-tests.outputs.HAS_TESTS }}",
             "gitRef": "${{ github.ref }}",
             "gitSha": "${{ github.sha }}",
             "actor": "${{ github.actor }}",
@@ -125,7 +153,19 @@ jobs:
           }
           EOF
       
+      - name: Skip tests if no test files found
+        if: steps.check-tests.outputs.HAS_TESTS == 'false'
+        run: |
+          echo "::warning::No test files found in ${{ steps.test-command.outputs.TEST_DIR }} for test suite '${{ matrix.test-suite }}'"
+          echo "Skipping test execution for this suite."
+          
+          # Update run-info.json with skipped status
+          jq '. + {status: "skipped", exitCode: 0, message: "No test files found"}' \
+            test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json > temp.json
+          mv temp.json test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json
+      
       - name: Run tests in Docker
+        if: steps.check-tests.outputs.HAS_TESTS == 'true'
         run: |
           docker run --rm \
             --name e2e-tests-${{ steps.timestamp.outputs.RUN_TIME }} \
@@ -146,12 +186,18 @@ jobs:
           EXIT_CODE="${{ job.status == 'success' && '0' || '1' }}"
           RUN_INFO_FILE="test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json"
           
-          # Check if run-info.json exists
+          # Check if already marked as skipped
           if [ -f "$RUN_INFO_FILE" ]; then
-            # Read existing run-info.json and add status fields
-            jq --arg status "$STATUS" --arg exitCode "$EXIT_CODE" \
-              '. + {status: $status, exitCode: ($exitCode | tonumber)}' \
-              "$RUN_INFO_FILE" > temp.json && mv temp.json "$RUN_INFO_FILE"
+            CURRENT_STATUS=$(jq -r '.status // "unknown"' "$RUN_INFO_FILE")
+            
+            if [ "$CURRENT_STATUS" = "skipped" ]; then
+              echo "Test suite was skipped (no test files found)"
+            else
+              # Update existing run-info.json with test results
+              jq --arg status "$STATUS" --arg exitCode "$EXIT_CODE" \
+                '. + {status: $status, exitCode: ($exitCode | tonumber)}' \
+                "$RUN_INFO_FILE" > temp.json && mv temp.json "$RUN_INFO_FILE"
+            fi
           else
             echo "Warning: run-info.json not found at $RUN_INFO_FILE"
             # Create a basic run-info.json with available information
@@ -196,16 +242,21 @@ jobs:
       - name: Publish test results summary
         if: always()
         run: |
+          RUN_INFO_FILE="test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json"
+          TEST_STATUS=$(jq -r '.status // "unknown"' "$RUN_INFO_FILE")
+          
           echo "## Test Results - ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Test Suite:** ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Base URL:** ${{ steps.base-url.outputs.BASE_URL }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Run Time:** ${{ steps.timestamp.outputs.RUN_TIME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** $TEST_STATUS" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [ -f "test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json" ]; then
+          if [ "$TEST_STATUS" = "skipped" ]; then
+            echo "⚠️ **Test suite skipped:** No test files found in \`${{ steps.test-command.outputs.TEST_DIR }}\`" >> $GITHUB_STEP_SUMMARY
+          elif [ -f "test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json" ]; then
             echo "### Results Summary" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
             cat test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json | jq '.suites[].suites[].specs[] | {title: .title, ok: .ok}' >> $GITHUB_STEP_SUMMARY
