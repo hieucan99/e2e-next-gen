@@ -1,6 +1,9 @@
 // utils/emailReport.ts
 // Utility to generate Playwright test result email subject and body
 
+import fs from 'fs';
+import glob from 'glob';
+
 /**
  * Summary of Playwright test execution for email reporting.
  */
@@ -81,11 +84,42 @@ export function buildEmailBody(summary: TestSummary): string {
         },
       },
     }));
+
+  // Aggregate all test cases from all results.json files (for matrix runs)
+  let allTestCases: Array<{ title: string; ok: boolean }> = [];
+  try {
+    const resultsFiles = glob.sync('test-results-all/**/results.json');
+    resultsFiles.forEach(file => {
+      const results = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      // Playwright JSON reporter structure
+      if (results.suites) {
+        results.suites.forEach((suite: any) => {
+          suite.suites.forEach((subSuite: any) => {
+            subSuite.specs.forEach((spec: any) => {
+              allTestCases.push({ title: spec.title, ok: spec.ok });
+            });
+          });
+        });
+      }
+      // Custom structure fallback
+      if (results.testCases) {
+        results.testCases.forEach((tc: any) => {
+          allTestCases.push({ title: tc.name, ok: tc.status === 'Passed' });
+        });
+      }
+    });
+  } catch (err) {
+    // Ignore errors, fallback to summary.testCases
+    if (summary.testCases && summary.testCases.length > 0) {
+      allTestCases = summary.testCases.map(tc => ({ title: tc.name, ok: tc.status === 'Passed' }));
+    }
+  }
+
   let resultsSummary = '';
-  if (summary.testCases && summary.testCases.length > 0) {
+  if (allTestCases.length > 0) {
     resultsSummary = `<h3 style='margin:24px 0 8px 0; font-size:18px;'>Results Summary</h3><pre style='background:#222; color:#fff; padding:12px; border-radius:6px;'><code>`;
-    summary.testCases.forEach(tc => {
-      resultsSummary += JSON.stringify({ title: tc.name, ok: tc.status === 'Passed' }, null, 2) + '\n';
+    allTestCases.forEach(tc => {
+      resultsSummary += JSON.stringify(tc, null, 2) + '\n';
     });
     resultsSummary += '</code></pre>';
   } else {
