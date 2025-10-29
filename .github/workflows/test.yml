@@ -88,9 +88,9 @@ jobs:
           tags: e2e-next-gen:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Generate run timestamp
-        id: timestamp
-        run: echo "RUN_TIME=$(date -u +%Y-%m-%dT%H-%M-%S)" >> $GITHUB_OUTPUT
+      - name: Generate run timestamp for HTML report
+        id: html_report_timestamp
+        run: echo "HTML_REPORT_TIME=$(date -u +%Y-%m-%dT%H-%M-%S)" >> $GITHUB_OUTPUT
       - name: Determine base URL
         id: base-url
         run: |
