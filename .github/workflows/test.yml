@@ -1,5 +1,42 @@
 name: E2E Test Suite
 
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run tests'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - functional
+          - regression
+          - api
+          - all
+      base_url:
+        description: 'Base URL (optional, overrides default)'
+        required: false
+        type: string
+
+env:
+  DOCKER_IMAGE_NAME: e2e-next-gen
+  DOCKER_IMAGE_TAG: ${{ github.sha }}
+
+jobs:
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
@@ -30,7 +67,7 @@ name: E2E Test Suite
     strategy:
       fail-fast: false
       matrix:
-        test-suite: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('[''{0}'']', github.event.inputs.test_suite)) || fromJSON('[''smoke'', ''functional'']') }}
+        test-suite: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.test_suite)) || fromJSON('["smoke", "functional"]') }}
     env:
       DOCKER_IMAGE_NAME: e2e-next-gen
       DOCKER_IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
@@ -40,58 +77,6 @@ name: E2E Test Suite
       - name: Generate run timestamp
         id: timestamp
         run: echo "RUN_TIME=$(date -u +%Y-%m-%dT%H-%M-%S)" >> $GITHUB_OUTPUT
-      ...existing code (all test steps except Send test report email)...
-
-  send-report:
-    name: Send Test Report Email
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Download all test results
-        uses: actions/download-artifact@v4
-        with:
-          path: test-results-all/
-      - name: Install dependencies
-        run: npm install
-      - name: Send test report email
-        run: |
-          npx ts-node scripts/send-test-report-email.ts
-        env:
-          SMTP_HOST: smtp.gmail.com
-          SMTP_PORT: 587
-          SMTP_SECURE: false
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_FROM: pmhcm1000@gmail.com
-          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-          REPORT_URL: https://github.com/hieucan99/e2e-next-gen/actions
-          # You may need to aggregate results from all test-results-all/*/results.json
-          RUN_INFO_PATH: test-results-all/*/run-info.json
-          RESULTS_PATH: test-results-all/*/results.json
-        description: 'Base URL (optional, overrides default)'
-        required: false
-        type: string
-
-env:
-  DOCKER_IMAGE_NAME: e2e-next-gen
-  DOCKER_IMAGE_TAG: ${{ github.sha }}
-
-jobs:
-  test:
-    name: Run E2E Tests
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        test-suite: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.test_suite)) || fromJSON('["smoke", "functional"]') }}
-    env:
-      DOCKER_IMAGE_NAME: e2e-next-gen
-      DOCKER_IMAGE_TAG: ${{ github.sha }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build Docker image
@@ -165,12 +150,6 @@ jobs:
               echo "✅ Found $TEST_COUNT test file(s) in $TEST_DIR"
             fi
           fi
-
-      - name: Send test report email
-        if: always()
-        run: |
-
-      
 
       - name: Create test results directory
         run: mkdir -p test-results/${{ steps.timestamp.outputs.RUN_TIME }}
@@ -268,23 +247,6 @@ jobs:
           EOF
           fi
 
-      - name: Send test report email
-        if: always()
-        run: |
-          npm install
-          npx ts-node scripts/send-test-report-email.ts
-        env:
-          SMTP_HOST: smtp.gmail.com
-          SMTP_PORT: 587
-          SMTP_SECURE: false
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_FROM: pmhcm1000@gmail.com
-          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-          REPORT_URL: https://github.com/hieucan99/e2e-next-gen/actions
-          RUN_INFO_PATH: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json
-          RESULTS_PATH: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json
-      
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -306,7 +268,6 @@ jobs:
         run: |
           RUN_INFO_FILE="test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json"
           TEST_STATUS=$(jq -r '.status // "unknown"' "$RUN_INFO_FILE")
-          
           echo "## Test Results - ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
@@ -315,7 +276,6 @@ jobs:
           echo "- **Run Time:** ${{ steps.timestamp.outputs.RUN_TIME }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** $TEST_STATUS" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
           if [ "$TEST_STATUS" = "skipped" ]; then
             echo "⚠️ **Test suite skipped:** No test files found in \`${{ steps.test-command.outputs.TEST_DIR }}\`" >> $GITHUB_STEP_SUMMARY
           elif [ -f "test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json" ]; then
@@ -324,13 +284,40 @@ jobs:
             cat test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json | jq '.suites[].suites[].specs[] | {title: .title, ok: .ok}' >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
-  
+
+  send-report:
+    name: Send Test Report Email
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results-all/
+      - name: Install dependencies
+        run: npm install
+      - name: Send test report email
+        run: |
+          npx ts-node scripts/send-test-report-email.ts
+        env:
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: 587
+          SMTP_SECURE: false
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: pmhcm1000@gmail.com
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          REPORT_URL: https://github.com/hieucan99/e2e-next-gen/actions
+          RUN_INFO_PATH: test-results-all/*/run-info.json
+          RESULTS_PATH: test-results-all/*/results.json
+
   notification:
     name: Notify Results
     needs: test
     if: always()
     runs-on: ubuntu-latest
-    
     steps:
       - name: Summary
         run: |
