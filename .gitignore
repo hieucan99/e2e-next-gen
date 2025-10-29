@@ -146,3 +146,4 @@ reports/
 # Test run history (keep only the history file, not individual runs)
 test-results/test-run-history.json
 !test-results/test-run-history.json
+scripts/test-send-report-email.ts

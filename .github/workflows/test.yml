@@ -127,6 +127,23 @@ jobs:
               echo "✅ Found $TEST_COUNT test file(s) in $TEST_DIR"
             fi
           fi
+
+      - name: Send test report email
+        if: always()
+        run: |
+          npm install
+          npx ts-node scripts/send-test-report-email.ts
+        env:
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: 587
+          SMTP_SECURE: false
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: pmhcm1000@gmail.com
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+          REPORT_URL: ${{ secrets.REPORT_URL }}
+          RUN_INFO_PATH: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/run-info.json
+          RESULTS_PATH: test-results/${{ steps.timestamp.outputs.RUN_TIME }}/results.json
       
       - name: Create test results directory
         run: mkdir -p test-results/${{ steps.timestamp.outputs.RUN_TIME }}
