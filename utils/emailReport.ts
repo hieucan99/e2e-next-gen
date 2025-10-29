@@ -81,15 +81,15 @@ export function buildEmailBody(summary: TestSummary): string {
         },
       },
     }));
-  let testCaseRows = '';
+  let resultsSummary = '';
   if (summary.testCases && summary.testCases.length > 0) {
-    testCaseRows = summary.testCases.map(tc => `
-      <tr>
-        <td style="${cellStyle}">${tc.name}</td>
-        <td style="${cellStyle}">${tc.suite}</td>
-        <td style="${cellStyle} color:${tc.status === 'Passed' ? passColor : tc.status === 'Failed' ? failColor : skipColor}; font-weight:bold;">${tc.status}</td>
-      </tr>
-    `).join('');
+    resultsSummary = `<h3 style='margin:24px 0 8px 0; font-size:18px;'>Results Summary</h3><pre style='background:#222; color:#fff; padding:12px; border-radius:6px;'><code>`;
+    summary.testCases.forEach(tc => {
+      resultsSummary += JSON.stringify({ title: tc.name, ok: tc.status === 'Passed' }, null, 2) + '\n';
+    });
+    resultsSummary += '</code></pre>';
+  } else {
+    resultsSummary = '<p>No test results found.</p>';
   }
   return `
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff; max-width:700px; margin:auto; font-family:Arial,sans-serif; border-radius:8px; box-shadow:0 2px 8px #eee;">
@@ -105,23 +105,15 @@ export function buildEmailBody(summary: TestSummary): string {
               <td style="padding:8px 16px; font-weight:bold; color:#f44336;">Fail</td>
               <td style="padding:8px 16px; font-weight:bold; color:#f44336;">${summary.failed}</td>
               <td style="padding:8px 16px; font-weight:bold; color:#2196f3;">In Progress</td>
-              <td style="padding:8px 16px; font-weight:bold; color:#2196f3;">${inProgress}</td>
+              <td style="padding:8px 16px; font-weight:bold; color:#2196f3;">0</td>
               <td style="padding:8px 16px; font-weight:bold; color:#ffc107;">Retest</td>
-              <td style="padding:8px 16px; font-weight:bold; color:#ffc107;">${retest}</td>
+              <td style="padding:8px 16px; font-weight:bold; color:#ffc107;">0</td>
               <td style="padding:8px 16px; font-weight:bold; color:#ff9800;">Skipped</td>
               <td style="padding:8px 16px; font-weight:bold; color:#ff9800;">${summary.skipped}</td>
             </tr>
           </table>
           <img src="${barChartUrl}" alt="Test Execution Results" style="width:100%; max-width:600px; margin-bottom:24px;" />
-          ${testCaseRows ? `<h3 style='margin:24px 0 8px 0; font-size:18px;'>Test Cases Ran</h3>
-          <table style='width:100%; border-collapse:collapse; margin-bottom:24px;'>
-            <tr style='background:#f4f4f4;'>
-              <th style='padding:8px 12px; border:1px solid #eee; text-align:left;'>Testcase Name</th>
-              <th style='padding:8px 12px; border:1px solid #eee; text-align:left;'>Test Suite</th>
-              <th style='padding:8px 12px; border:1px solid #eee; text-align:left;'>Status</th>
-            </tr>
-            ${testCaseRows}
-          </table>` : ''}
+          ${resultsSummary}
           <p style="margin-top:24px; font-size:16px;">Detailed report: <a href="${summary.reportUrl}" style="color:#1a0dab;">View on GitHub Pages</a></p>
         </td>
       </tr>
